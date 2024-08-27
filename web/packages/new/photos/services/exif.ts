@@ -1,35 +1,10 @@
-import { isDevBuild } from "@/base/env";
-import log from "@/base/log";
+import { inWorker } from "@/base/env";
 import {
     parseMetadataDate,
     type ParsedMetadata,
     type ParsedMetadataDate,
 } from "@/media/file-metadata";
 import ExifReader from "exifreader";
-import type { ParsedExtractedMetadata } from "../types/metadata";
-import { isInternalUser } from "./feature-flags";
-
-// TODO: Exif: WIP flag to inspect the migration from old to new lib.
-export const wipNewLib = async () => isDevBuild && (await isInternalUser());
-
-export const cmpNewLib = (
-    oldLib: ParsedExtractedMetadata,
-    newLib: ParsedMetadata,
-) => {
-    if (
-        oldLib.creationTime == newLib.creationDate?.timestamp &&
-        oldLib.location.latitude == newLib.location?.latitude &&
-        oldLib.location.longitude == newLib.location?.longitude
-    ) {
-        if (oldLib.width == newLib.width && oldLib.height == newLib.height)
-            log.info("Exif migration ✅");
-        else log.info("Exif migration ✅✨");
-        log.debug(() => ["exif/cmp", { oldLib, newLib }]);
-    } else {
-        log.info("Exif migration - Potential mismatch ❗️🚩");
-        log.info({ oldLib, newLib });
-    }
-};
 
 /**
  * Extract Exif and other metadata from the given file.
@@ -134,8 +109,6 @@ const parseDates = (tags: RawExifTags) => {
     const exif = parseExifDates(tags);
     const iptc = parseIPTCDates(tags);
     const xmp = parseXMPDates(tags);
-
-    log.debug(() => ["exif/dates", { exif, iptc, xmp }]);
 
     return {
         DateTimeOriginal:
@@ -502,6 +475,17 @@ export type RawExifTags = Omit<ExifReader.ExpandedTags, "Thumbnail" | "xmp"> & {
  * to know about ExifReader specifically.
  */
 export const extractRawExif = async (blob: Blob): Promise<RawExifTags> => {
+    // The browser's DOMParser is not available in web workers. So if this
+    // function gets called in from a web worker, then it would not be able to
+    // parse XMP tags.
+    //
+    // There is a way around this problem, by also installing ExifReader's
+    // optional peer dependency "@xmldom/xmldom". But since we currently have no
+    // use case for calling this code in a web worker, we just abort immediately
+    // to let future us know that we need to install it.
+    if (inWorker())
+        throw new Error("DOMParser is not available in web workers");
+
     const tags = await ExifReader.load(await blob.arrayBuffer(), {
         async: true,
         expanded: true,

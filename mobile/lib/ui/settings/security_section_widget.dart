@@ -132,7 +132,16 @@ class _SecuritySectionWidgetState extends State<SecuritySectionWidget> {
             pressedColor: getEnteColorScheme(context).fillFaint,
             trailingIcon: Icons.chevron_right_outlined,
             trailingIconIsMuted: true,
-            onTap: () async => await onPasskeyClick(context),
+            onTap: () async {
+              final hasAuthenticated = await LocalAuthenticationService.instance
+                  .requestLocalAuthentication(
+                context,
+                S.of(context).authToViewPasskey,
+              );
+              if (hasAuthenticated) {
+                await onPasskeyClick(context);
+              }
+            },
           ),
           sectionOptionSpacing,
         ],
@@ -145,6 +154,7 @@ class _SecuritySectionWidgetState extends State<SecuritySectionWidget> {
         ),
         trailingIcon: Icons.chevron_right_outlined,
         trailingIconIsMuted: true,
+        surfaceExecutionStates: false,
         onTap: () async {
           if (await LocalAuthentication().isDeviceSupported()) {
             final bool result = await requestAuthentication(

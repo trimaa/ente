@@ -49,7 +49,6 @@ import { AppContext } from "pages/_app";
 import { GalleryContext } from "pages/gallery";
 import { trashFiles } from "services/fileService";
 import { SetFilesDownloadProgressAttributesCreator } from "types/gallery";
-import { isClipboardItemPresent } from "utils/common";
 import { pauseVideo, playVideo } from "utils/photoFrame";
 import { PublicCollectionGalleryContext } from "utils/publicCollectionGallery";
 import { getTrashFileMessage } from "utils/ui";
@@ -126,7 +125,10 @@ function PhotoViewer(props: Iprops) {
 
     const needUpdate = useRef(false);
     const exifExtractionInProgress = useRef<string>(null);
-    const shouldShowCopyOption = useMemo(() => isClipboardItemPresent(), []);
+    const shouldShowCopyOption = useMemo(
+        () => typeof ClipboardItem != "undefined",
+        [],
+    );
 
     const [showImageEditorOverlay, setShowImageEditorOverlay] = useState(false);
 
@@ -310,7 +312,10 @@ function PhotoViewer(props: Iprops) {
 
     function updateExif(file: EnteFile) {
         if (file.metadata.fileType === FileType.video) {
-            setExif({ key: file.src, value: undefined });
+            setExif({
+                key: file.src,
+                value: { tags: undefined, parsed: undefined },
+            });
             return;
         }
         if (!file || !file.isSourceLoaded || file.conversionFailed) {
